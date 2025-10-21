@@ -1,0 +1,3 @@
+# TODO: Pin toolchain versions
+opa 0.67.0
+go 1.22.3

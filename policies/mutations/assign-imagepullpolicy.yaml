@@ -1,0 +1,16 @@
+apiVersion: mutations.gatekeeper.sh/v1
+kind: Assign
+metadata:
+  name: assign-imagepullpolicy-ifnotpresent
+spec:
+  applyTo:
+    - groups: [""]
+      kinds: ["Pod"]
+      versions: ["v1"]
+  match:
+    scope: Namespaced
+    excludedNamespaces: ["kube-system", "gatekeeper-system"]
+  location: "spec.containers[name:*].imagePullPolicy"
+  parameters:
+    assign:
+      value: IfNotPresent

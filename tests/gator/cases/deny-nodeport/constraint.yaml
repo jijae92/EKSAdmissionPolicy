@@ -1,0 +1,14 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: DenyNodePort
+metadata:
+  name: service-deny-nodeport
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Service"]
+  parameters:
+    waiver:
+      expiryAnnotation: guardrails.gatekeeper.dev/waive-until
+      reasonAnnotation: guardrails.gatekeeper.dev/waive-reason

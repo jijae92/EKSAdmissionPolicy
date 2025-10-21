@@ -1,0 +1,14 @@
+mutating:
+  enabled: true
+audit:
+  interval: 60
+  logLevel: WARN
+  chunkSize: 500
+  violationLimits:
+    defaults: 20
+controllerManager:
+  health:
+    enabled: true
+  readiness:
+    enabled: true
+# TODO: Review replicaCount and resources aligned with target cluster size.

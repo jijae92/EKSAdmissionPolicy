@@ -1,0 +1,40 @@
+name: gatekeeper-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kind
+        uses: helm/kind-action@v1
+        with:
+          version: v0.23.0
+
+      - name: Install Gatekeeper via Helm
+        run: |
+          ./infra/cluster/install_gatekeeper.sh
+          kubectl -n gatekeeper-system rollout status deploy/gatekeeper-controller-manager --timeout=180s
+
+      - name: Apply Policies
+        run: ./scripts/apply_policies.sh
+
+      - name: Run gator tests
+        run: |
+          curl -L https://github.com/open-policy-agent/gatekeeper/releases/latest/download/gator-linux-amd64 -o gator
+          chmod +x gator
+          sudo mv gator /usr/local/bin/
+          make gator
+
+      - name: Negative demo (should deny)
+        run: |
+          set +e
+          ./scripts/test_violation_demo.sh && exit 1 || echo "denies observed (expected)"
+          set -e
+
+      - name: Waiver demo (optional)
+        run: ./scripts/test_waiver_demo.sh

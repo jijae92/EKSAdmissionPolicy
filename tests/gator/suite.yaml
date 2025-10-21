@@ -1,0 +1,138 @@
+apiVersion: test.gatekeeper.sh/v1beta1
+kind: Suite
+metadata:
+  name: gatekeeper-policy-suite
+spec:
+  cases:
+    - name: deny-privileged
+      template: cases/deny-privileged/template.yaml
+      constraint: cases/deny-privileged/constraint.yaml
+      tests:
+        - name: privileged-container
+          data: cases/deny-privileged/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: non-privileged-container
+          data: cases/deny-privileged/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: deny-host-namespaces
+      template: cases/deny-host-namespaces/template.yaml
+      constraint: cases/deny-host-namespaces/constraint.yaml
+      tests:
+        - name: uses-host-network
+          data: cases/deny-host-namespaces/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: isolated-pod
+          data: cases/deny-host-namespaces/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: enforce-capabilities
+      template: cases/enforce-capabilities/template.yaml
+      constraint: cases/enforce-capabilities/constraint.yaml
+      tests:
+        - name: adds-sys-admin
+          data: cases/enforce-capabilities/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: drops-all
+          data: cases/enforce-capabilities/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: enforce-nonroot
+      template: cases/enforce-nonroot/template.yaml
+      constraint: cases/enforce-nonroot/constraint.yaml
+      tests:
+        - name: runs-as-root
+          data: cases/enforce-nonroot/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: runs-as-nonroot
+          data: cases/enforce-nonroot/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: enforce-seccomp
+      template: cases/enforce-seccomp/template.yaml
+      constraint: cases/enforce-seccomp/constraint.yaml
+      tests:
+        - name: seccomp-missing
+          data: cases/enforce-seccomp/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: seccomp-runtime-default
+          data: cases/enforce-seccomp/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: allowlist-registries
+      template: cases/allowlist-registries/template.yaml
+      constraint: cases/allowlist-registries/constraint.yaml
+      tests:
+        - name: registry-not-allowed
+          data: cases/allowlist-registries/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: registry-allowlisted
+          data: cases/allowlist-registries/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: deny-latest-tag
+      template: cases/deny-latest-tag/template.yaml
+      constraint: cases/deny-latest-tag/constraint.yaml
+      tests:
+        - name: image-uses-latest
+          data: cases/deny-latest-tag/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: image-pinned
+          data: cases/deny-latest-tag/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: require-requests-limits
+      template: cases/require-requests-limits/template.yaml
+      constraint: cases/require-requests-limits/constraint.yaml
+      tests:
+        - name: missing-resources
+          data: cases/require-requests-limits/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: requests-and-limits
+          data: cases/require-requests-limits/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: deny-nodeport
+      template: cases/deny-nodeport/template.yaml
+      constraint: cases/deny-nodeport/constraint.yaml
+      tests:
+        - name: service-nodeport
+          data: cases/deny-nodeport/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: service-clusterip
+          data: cases/deny-nodeport/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: enforce-ingress-tls-host
+      template: cases/enforce-ingress-tls-host/template.yaml
+      constraint: cases/enforce-ingress-tls-host/constraint.yaml
+      tests:
+        - name: ingress-missing-tls
+          data: cases/enforce-ingress-tls-host/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: ingress-with-tls
+          data: cases/enforce-ingress-tls-host/samples/allow.yaml
+          expect:
+            violations: 0
+    - name: required-labels-namespace
+      template: cases/required-labels-namespace/template.yaml
+      constraint: cases/required-labels-namespace/constraint.yaml
+      tests:
+        - name: namespace-missing-labels
+          data: cases/required-labels-namespace/samples/deny.yaml
+          expect:
+            violations: 1
+        - name: namespace-has-labels
+          data: cases/required-labels-namespace/samples/allow.yaml
+          expect:
+            violations: 0

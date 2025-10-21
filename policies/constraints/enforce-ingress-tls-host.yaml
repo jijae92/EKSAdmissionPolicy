@@ -1,0 +1,14 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: IngressTLSHost
+metadata:
+  name: ingress-enforce-tls-host
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: ["networking.k8s.io"]
+        kinds: ["Ingress"]
+  parameters:
+    waiver:
+      expiryAnnotation: guardrails.gatekeeper.dev/waive-until
+      reasonAnnotation: guardrails.gatekeeper.dev/waive-reason

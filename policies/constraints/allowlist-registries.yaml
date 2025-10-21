@@ -1,0 +1,21 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: ImageRegistryAllowlist
+metadata:
+  name: pod-allowlist-registries
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "DaemonSet", "StatefulSet", "ReplicaSet"]
+      - apiGroups: ["batch"]
+        kinds: ["Job", "CronJob"]
+  parameters:
+    allowedRegistries:
+      - 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com
+      - gcr.io/your-org
+    waiver:
+      expiryAnnotation: guardrails.gatekeeper.dev/waive-until
+      reasonAnnotation: guardrails.gatekeeper.dev/waive-reason

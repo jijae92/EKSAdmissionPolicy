@@ -1,0 +1,16 @@
+# TODO: Customize EKS cluster spec for deploying Gatekeeper in shared accounts.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: eks-gatekeeper-demo
+  region: us-west-2
+managedNodeGroups:
+  - name: ng-gatekeeper
+    instanceType: t3.medium
+    desiredCapacity: 2
+    ssh:
+      allow: false
+addons:
+  - name: vpc-cni
+  - name: kube-proxy
+  - name: coredns

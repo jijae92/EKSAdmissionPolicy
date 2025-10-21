@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-allow-nodeport
+spec:
+  type: ClusterIP
+  selector:
+    app: demo
+  ports:
+    - port: 80
+      targetPort: 80

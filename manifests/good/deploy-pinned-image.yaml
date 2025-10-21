@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: good-pinned-image
+  labels:
+    app: good-pinned-image
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: good-pinned-image
+  template:
+    metadata:
+      labels:
+        app: good-pinned-image
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/web/nginx@sha256:2e7c4b0ed1fcf8e7d662692f625d19d56d5f1dfd3d1f1b0c0d7b8a6f779d9236
+          ports:
+            - containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi

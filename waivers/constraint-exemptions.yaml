@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: constraint-exemptions
+  namespace: gatekeeper-system
+data:
+  namespace-waiver.yaml: |
+    # Strategy 1: Namespace-wide waiver
+    # Apply this snippet as a strategic merge patch to a constraint to scope enforcement
+    # to namespaces that are explicitly labeled for a temporary waiver.
+    match:
+      namespaceSelector:
+        matchExpressions:
+          - key: guardrails.gatekeeper.dev/waive
+            operator: In
+            values:
+              - "true"
+  object-waiver.yaml: |
+    # Strategy 2: Object-level waiver with expiry annotations
+    # Match individual resources (Deployments, Jobs, etc.) carrying the waive annotations.
+    match:
+      scope: Namespaced
+      objectSelector:
+        matchExpressions:
+          - key: guardrails.gatekeeper.dev/waive-until
+            operator: Exists
+    parameters:
+      expiryAnnotation: guardrails.gatekeeper.dev/waive-until
+      reasonAnnotation: guardrails.gatekeeper.dev/waive-reason
+    # Rego checks guardrails.gatekeeper.dev/waive-until on every admission and compares it
+    # to time.now_ns(), so denial resumes automatically once the date is in the past.

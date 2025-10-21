@@ -1,0 +1,228 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: pspcapabilities
+spec:
+  crd:
+    spec:
+      names:
+        kind: PSPCapabilities
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowedAdd:
+              type: array
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package admission.pspcapabilities
+
+        violation[{"msg": msg, "details": {"resource": input.review.kind.kind, "container": entry.name, "path": path}}] {
+          not waiver_exempts
+          spec_info := workload_specs[_]
+          entry := workload_containers(spec_info)[_]
+          not has_drop_all(entry.container)
+          path := sprintf("%s.securityContext.capabilities.drop", [entry.path])
+          msg := sprintf("Capabilities policy violation: ALL must be dropped. resource=%s container=%q path=%s", [input.review.kind.kind, entry.name, path])
+        }
+
+        violation[{"msg": msg, "details": {"resource": input.review.kind.kind, "container": entry.name, "capability": cap_upper, "path": path}}] {
+          not waiver_exempts
+          spec_info := workload_specs[_]
+          entry := workload_containers(spec_info)[_]
+          cap_upper := added_capability(entry.container)
+          not allowed_add[cap_upper]
+          path := sprintf("%s.securityContext.capabilities.add", [entry.path])
+          msg := sprintf("Capabilities policy violation: capability %q is not in the allow list. resource=%s container=%q path=%s", [cap_upper, input.review.kind.kind, entry.name, path])
+        }
+
+        workload_containers(spec_info)[entry] {
+          container := object.get(spec_info.spec, "containers", [])[_]
+          entry := {
+            "name": object.get(container, "name", "<unnamed>"),
+            "container": container,
+            "path": sprintf("%s.containers[*]", [spec_info.path])
+          }
+        }
+
+        workload_containers(spec_info)[entry] {
+          container := object.get(spec_info.spec, "initContainers", [])[_]
+          entry := {
+            "name": object.get(container, "name", "<unnamed>"),
+            "container": container,
+            "path": sprintf("%s.initContainers[*]", [spec_info.path])
+          }
+        }
+
+        has_drop_all(container) {
+          sc := object.get(container, "securityContext", {})
+          caps := object.get(sc, "capabilities", {})
+          drops := object.get(caps, "drop", [])
+          drop := drops[_]
+          upper(drop) == "ALL"
+        }
+
+        added_capability(container) = cap_upper {
+          sc := object.get(container, "securityContext", {})
+          caps := object.get(sc, "capabilities", {})
+          cap := object.get(caps, "add", [])[_]
+          cap_upper := upper(cap)
+        }
+
+        allowed_add[cap] {
+          params := object.get(input, "parameters", {})
+          caps := object.get(params, "allowedAdd", [])
+          raw := caps[_]
+          cap := upper(raw)
+        }
+
+        workload_specs[{"spec": spec, "path": "spec"}] {
+          input.review.kind.kind == "Pod"
+          spec := input.review.object.spec
+        }
+
+        workload_specs[{"spec": spec, "path": "spec.template.spec"}] {
+          kind := input.review.kind.kind
+          kind == "Deployment" or
+          kind == "ReplicaSet" or
+          kind == "DaemonSet" or
+          kind == "StatefulSet" or
+          kind == "Job"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[{"spec": spec, "path": "spec.jobTemplate.spec.template.spec"}] {
+          input.review.kind.kind == "CronJob"
+          spec := input.review.object.spec.jobTemplate.spec.template.spec
+        }
+
+        violation[entry] {
+          entry := waiver_violations[_]
+        }
+
+        waiver_violations[{"msg": msg, "details": {"resource": input.review.kind.kind, "path": path}}] {
+          waiver_enabled
+          waiver_reason_missing
+          reason_key := waiver_reason_key
+          reason_key != ""
+          path := sprintf("metadata.annotations[%q]", [reason_key])
+          msg := sprintf("Waiver reason annotation %q must be provided whenever %q is set. resource=%s path=%s", [reason_key, waiver_expiry_key, input.review.kind.kind, path])
+        }
+
+        waiver_violations[{"msg": msg, "details": {"resource": input.review.kind.kind, "path": path}}] {
+          waiver_enabled
+          waiver_expiry_parse_error
+          path := sprintf("metadata.annotations[%q]", [waiver_expiry_key])
+          msg := sprintf("Waiver expiry annotation %q must use YYYY-MM-DD or RFC3339 format. resource=%s path=%s", [waiver_expiry_key, input.review.kind.kind, path])
+        }
+
+        waiver_violations[{"msg": msg, "details": {"resource": input.review.kind.kind, "path": path}}] {
+          waiver_enabled
+          waiver_expired
+          waiver_expiry_value(value)
+          path := sprintf("metadata.annotations[%q]", [waiver_expiry_key])
+          msg := sprintf("Waiver expired on %s; policy enforcement has resumed. resource=%s path=%s", [value, input.review.kind.kind, path])
+        }
+
+        waiver_exempts {
+          waiver_enabled
+          waiver_requested
+          waiver_reason_present
+          waiver_expiry_ts(ts)
+          ts >= time.now_ns()
+        }
+
+        waiver_reason_present {
+          reason_key := waiver_reason_key
+          reason_key == ""
+        }
+
+        waiver_reason_present {
+          reason_key := waiver_reason_key
+          reason_key != ""
+          annotations := waiver_annotations
+          val := trim_space(object.get(annotations, reason_key, ""))
+          val != ""
+        }
+
+        waiver_reason_missing {
+          waiver_requested
+          reason_key := waiver_reason_key
+          reason_key != ""
+          annotations := waiver_annotations
+          val := trim_space(object.get(annotations, reason_key, ""))
+          val == ""
+        }
+
+        waiver_expiry_parse_error {
+          waiver_requested
+          waiver_expiry_value(value)
+          not parse_waiver_expiry(value, _)
+        }
+
+        waiver_expired {
+          waiver_expiry_ts(ts)
+          ts < time.now_ns()
+        }
+
+        waiver_expiry_ts(ts) {
+          waiver_expiry_value(value)
+          parse_waiver_expiry(value, ts)
+        }
+
+        parse_waiver_expiry(value, ts) {
+          re_match(`^\d{4}-\d{2}-\d{2}$`, value)
+          ts := time.parse_rfc3339_ns(sprintf("%sT23:59:59Z", [value]))
+        }
+
+        parse_waiver_expiry(value, ts) {
+          re_match(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`, value)
+          ts := time.parse_rfc3339_ns(value)
+        }
+
+        parse_waiver_expiry(value, ts) {
+          re_match(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$`, value)
+          ts := time.parse_rfc3339_ns(value)
+        }
+
+        waiver_expiry_value(value) {
+          waiver_requested
+          annotations := waiver_annotations
+          key := waiver_expiry_key
+          raw := object.get(annotations, key, "")
+          value := trim_space(raw)
+        }
+
+        waiver_requested {
+          waiver_enabled
+          annotations := waiver_annotations
+          key := waiver_expiry_key
+          val := trim_space(object.get(annotations, key, ""))
+          val != ""
+        }
+
+        waiver_annotations = annotations {
+          metadata := object.get(input.review.object, "metadata", {})
+          annotations := object.get(metadata, "annotations", {})
+        }
+
+        waiver_enabled {
+          waiver_expiry_key != ""
+        }
+
+        waiver_config = object.get(object.get(input, "parameters", {}), "waiver", {})
+
+        waiver_expiry_key = key {
+          key := object.get(waiver_config, "expiryAnnotation", "")
+        }
+
+        waiver_reason_key = key {
+          key := object.get(waiver_config, "reasonAnnotation", "")
+        }
+
+        trim_space(val) = trimmed {
+          trimmed := trim(val, " \t\r\n")
+        }

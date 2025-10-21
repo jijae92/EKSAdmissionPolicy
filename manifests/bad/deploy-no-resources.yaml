@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-no-resources
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bad-no-resources
+  template:
+    metadata:
+      labels:
+        app: bad-no-resources
+    spec:
+      containers:
+        - name: app
+          image: 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/security/nginx:1.25.5
+          ports:
+            - containerPort: 80
+          securityContext:
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL

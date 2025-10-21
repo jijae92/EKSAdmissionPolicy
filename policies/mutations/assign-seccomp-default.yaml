@@ -1,0 +1,22 @@
+apiVersion: mutations.gatekeeper.sh/v1
+kind: Assign
+metadata:
+  name: assign-seccomp-runtime-default
+spec:
+  applyTo:
+    - groups: [""]
+      kinds: ["Pod"]
+      versions: ["v1"]
+    - groups: ["apps"]
+      kinds: ["Deployment", "DaemonSet", "StatefulSet", "ReplicaSet"]
+      versions: ["v1"]
+    - groups: ["batch"]
+      kinds: ["Job", "CronJob"]
+      versions: ["v1"]
+  match:
+    scope: Namespaced
+    excludedNamespaces: ["kube-system", "gatekeeper-system"]
+  location: "spec.template.spec.securityContext.seccompProfile.type"
+  parameters:
+    assign:
+      value: RuntimeDefault
